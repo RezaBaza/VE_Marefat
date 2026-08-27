@@ -124,10 +124,22 @@ def _ts(t: float) -> str:
     return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{int((s - int(s)) * 1000):03d}"
 
 
-def write_srt(cues: list[Cue], path: str) -> str:
+# U+200F, zero width. A right-to-left script is only rendered right-to-left if
+# the renderer decides the line's base direction is RTL - and text editors
+# routinely default to LTR, which throws a trailing full stop to the wrong end
+# of the line. libass gets this right on its own, so burned-in subtitles were
+# never affected; the file being unreadable in an editor still is. One
+# invisible character at the head of each line settles it everywhere.
+RLM = "\u200f"
+
+
+def write_srt(cues: list[Cue], path: str, rtl: bool = False) -> str:
     with open(path, "w", encoding="utf-8") as f:
         for i, c in enumerate(cues, 1):
-            f.write(f"{i}\n{_ts(c.start)} --> {_ts(c.end)}\n{wrap(c.text)}\n\n")
+            text = wrap(c.text)
+            if rtl:
+                text = "\n".join(RLM + line for line in text.split("\n"))
+            f.write(f"{i}\n{_ts(c.start)} --> {_ts(c.end)}\n{text}\n\n")
     return path
 
 

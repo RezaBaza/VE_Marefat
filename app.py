@@ -108,7 +108,7 @@ if st.button("Build video", type="primary", disabled=video_file is None):
                 S.unload()
                 from pipeline import translate as T
                 fa = T.translate_cues(cues, progress=lambda p, m: report(0.7 + p * 0.2, m))
-                srts["fas"] = S.write_srt(fa, os.path.join(workdir, "fa.srt"))
+                srts["fas"] = S.write_srt(fa, os.path.join(workdir, "fa.srt"), rtl=True)
 
             report(0.92, "Attaching subtitles")
             subbed = os.path.join(workdir, "final.mp4")
