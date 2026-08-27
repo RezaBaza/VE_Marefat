@@ -124,13 +124,21 @@ def _ts(t: float) -> str:
     return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{int((s - int(s)) * 1000):03d}"
 
 
-# U+200F, zero width. A right-to-left script is only rendered right-to-left if
-# the renderer decides the line's base direction is RTL - and text editors
-# routinely default to LTR, which throws a trailing full stop to the wrong end
-# of the line. libass gets this right on its own, so burned-in subtitles were
-# never affected; the file being unreadable in an editor still is. One
-# invisible character at the head of each line settles it everywhere.
-RLM = "\u200f"
+# Zero-width bidi controls: RIGHT-TO-LEFT EMBEDDING opens a forced RTL run,
+# POP DIRECTIONAL FORMATTING closes it.
+#
+# A trailing full stop is bidi-neutral, so it takes the direction of whatever
+# surrounds it. At the end of a line the thing after it is the line break, and
+# the neutral then falls back to the *paragraph* direction - which text editors
+# and some players fix at left-to-right. The stop is thrown to the right-hand
+# edge, where an RTL sentence begins rather than ends.
+#
+# A leading RLM does not help: it is before the text, and the stop's problem is
+# what comes after it. Wrapping the whole line settles both ends, in every
+# renderer, whatever base direction it assumes. Verified against the reference
+# Unicode bidi implementation for LTR and RTL base directions alike.
+RLE = "\u202b"   # RIGHT-TO-LEFT EMBEDDING
+PDF = "\u202c"   # POP DIRECTIONAL FORMATTING
 
 
 def write_srt(cues: list[Cue], path: str, rtl: bool = False) -> str:
@@ -138,7 +146,10 @@ def write_srt(cues: list[Cue], path: str, rtl: bool = False) -> str:
         for i, c in enumerate(cues, 1):
             text = wrap(c.text)
             if rtl:
-                text = "\n".join(RLM + line for line in text.split("\n"))
+                # per line: libass treats each rendered line as its own
+                # paragraph, so wrapping the cue as a whole would leave the
+                # second line unprotected
+                text = "\n".join(RLE + line + PDF for line in text.split("\n"))
             f.write(f"{i}\n{_ts(c.start)} --> {_ts(c.end)}\n{text}\n\n")
     return path
 
