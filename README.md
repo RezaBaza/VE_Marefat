@@ -4,7 +4,7 @@ Upload a lesson clip, get it back with the Marefat branding wrapped around it �
 and optional English or Farsi subtitles.
 
 ```
-opening card (10s) → intro → your clip (+ animated logo) → outro
+opening card (3s) → intro → your clip (+ animated logo) → outro
 ```
 
 Everything runs on free, open-source tools. No API keys, no per-video cost.
