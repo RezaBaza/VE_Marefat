@@ -12,11 +12,53 @@ from pipeline.runtime import cpu_limit, stage
 
 st.set_page_config(page_title="Marefat Video Builder", page_icon="🎬")
 
-st.title("Marefat Video Builder")
+st.title("POC (Proof of Concept) Marefat Video Builder")
 st.caption(
     "Adds the opening card, intro, animated logo and outro. "
     "Subtitles are optional."
 )
+
+with st.expander("راهنما  ·  How this works"):
+    st.markdown(
+        """
+<div dir="rtl" style="line-height:2;">
+
+**ساختار هر ویدیو**
+
+۱. تصویر آغازین — ۱۰ ثانیه &nbsp;·&nbsp; ۲. کلیپ ابتدایی — ۸ ثانیه &nbsp;·&nbsp;
+۳. ویدیوی درس، با لوگوی متحرک در گوشه &nbsp;·&nbsp; ۴. کلیپ پایانی — ۱۲ ثانیه
+
+همهٔ بخش‌ها پیش از اتصال به یک کیفیت، نرخ فریم و قالب صدای یکسان تبدیل می‌شوند تا
+در محل اتصال پرش تصویر یا قطعی صدا رخ ندهد.
+
+**زیرنویس**
+
+گفتار انگلیسی نخست به متن تبدیل می‌شود و سپس همان متن به فارسی ترجمه می‌گردد.
+زمان‌بندی هر دو زبان یکسان است. **ترجمه ماشینی است** و برای انتشار عمومی باید
+بازبینی شود — فایل زیرنویس جداگانه قابل دانلود و ویرایش است.
+
+هیچ ویدیو یا متنی به سرویس بیرونی فرستاده نمی‌شود؛ همهٔ پردازش روی همین سرور
+انجام می‌گیرد.
+
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+---
+
+1. **Branding** — your clip is normalised to 1280×720 / 30fps / stereo 48kHz,
+   then joined behind the opening card and intro and ahead of the outro. The
+   animated logo plays once over the first seconds of your clip.
+2. **Subtitles** *(optional)* — Whisper transcribes the finished video and
+   subtitles are rebuilt from word-level timestamps at sentence boundaries.
+3. **Farsi** *(optional)* — NLLB-200 translates the English lines. Timings are
+   reused exactly, so the two languages stay in sync.
+
+Nothing is sent to an external service — all three models run in this container.
+"""
+    )
 
 video_file = st.file_uploader(
     "Main video", type=["mp4", "mov", "mkv", "m4v"],
@@ -122,19 +164,3 @@ if st.button("Build video", type="primary", disabled=video_file is None):
     except Exception as exc:  # surfaced in the UI rather than only in logs
         st.error(f"Something went wrong: {exc}")
         raise
-
-with st.expander("How this works"):
-    st.markdown(
-        """
-1. **Branding** - your clip is normalised to 1280x720 / 30fps / stereo 48kHz,
-   then joined behind the opening card and intro and ahead of the outro. The
-   animated logo plays once over the first seconds of your clip.
-2. **Subtitles** *(optional)* - Whisper transcribes the finished video and
-   subtitles are rebuilt from word-level timestamps at sentence boundaries.
-3. **Farsi** *(optional)* - NLLB-200 translates the English lines. Timings are
-   reused exactly, so the two languages stay in sync.
-
-Machine translation is a first draft. For anything published, export the
-`.srt` and correct it.
-"""
-    )
