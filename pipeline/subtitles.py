@@ -13,6 +13,13 @@ import tempfile
 from dataclasses import dataclass
 
 MODEL_SIZE = os.environ.get("WHISPER_MODEL", "small")   # tiny|base|small|medium
+# Burned-in appearance. A solid box beats an outline here: the footage is
+# mostly white whiteboard, and white-on-white outlined text disappears.
+# libass ignores BackColour alpha with BorderStyle=3, so the box is opaque.
+SUB_FONTSIZE = int(os.environ.get("SUB_FONTSIZE", "14"))
+SUB_MARGIN = int(os.environ.get("SUB_MARGIN", "22"))
+SUB_STYLE = os.environ.get("SUB_STYLE", "")   # full override, wins if set
+
 MAX_CUE = 84       # characters per subtitle
 MAX_LINE = 42      # characters per displayed line (2 lines max)
 MAX_GAP = 0.7      # a pause longer than this always starts a new cue
@@ -141,7 +148,15 @@ def attach(video: str, srt_paths: dict[str, str], out_path: str,
 
     if burn:
         font = "Noto Naskh Arabic" if burn == "fas" else "DejaVu Sans"
-        style = f"FontName={font},Fontsize=18,Outline=1,Shadow=0,MarginV=30"
+        style = SUB_STYLE or (
+            f"FontName={font},Fontsize={SUB_FONTSIZE},"
+            "PrimaryColour=&H00FFFFFF,"      # white text
+            "BackColour=&H00000000,"         # solid black box behind it
+            "BorderStyle=3,"                 # 3 = box (not outline)
+            "Outline=1.2,"                   # padding around the text
+            "Shadow=0,"
+            f"MarginV={SUB_MARGIN}"
+        )
         srt = srt_paths[burn].replace("\\", "/").replace(":", r"\:")
         cmd += ["-vf", f"subtitles={srt}:force_style='{style}'",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
