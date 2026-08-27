@@ -8,6 +8,7 @@ import streamlit as st
 
 from pipeline import assemble as A
 from pipeline import subtitles as S
+from pipeline.runtime import cpu_limit, stage
 
 st.set_page_config(page_title="Marefat Video Builder", page_icon="🎬")
 
@@ -76,8 +77,9 @@ if st.button("Build video", type="primary", disabled=video_file is None):
 
         # ---- step 1: branding ------------------------------------------
         branded = os.path.join(workdir, "branded.mp4")
-        A.assemble(src, branded, picture=pic_path,
-                   progress=lambda p, m: report(p * 0.4, m))
+        with stage("assemble"):
+            A.assemble(src, branded, picture=pic_path,
+                       progress=lambda p, m: report(p * 0.4, m))
         result = branded
 
         # ---- step 2 + 3: subtitles -------------------------------------
@@ -89,6 +91,9 @@ if st.button("Build video", type="primary", disabled=video_file is None):
                 srts["eng"] = S.write_srt(cues, os.path.join(workdir, "en.srt"))
 
             if sub_choice in ("Farsi", "Both"):
+                # Whisper is done; free it before the translator loads, so the
+                # two never occupy the container's memory at the same time
+                S.unload()
                 from pipeline import translate as T
                 fa = T.translate_cues(cues, progress=lambda p, m: report(0.7 + p * 0.2, m))
                 srts["fas"] = S.write_srt(fa, os.path.join(workdir, "fa.srt"))

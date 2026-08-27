@@ -6,11 +6,14 @@ cues ending on a dangling "and"; rebuilding avoids that.
 """
 from __future__ import annotations
 
+import gc
 import os
 import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
+
+from pipeline.runtime import cpu_limit, log_memory, stage
 
 MODEL_SIZE = os.environ.get("WHISPER_MODEL", "small")   # tiny|base|small|medium
 # Burned-in appearance. A solid box beats an outline here: the footage is
@@ -40,9 +43,24 @@ def _load():
     global _model
     if _model is None:
         from faster_whisper import WhisperModel
+        # cpu_limit(), not os.cpu_count(): see pipeline/runtime.py
         _model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8",
-                              cpu_threads=os.cpu_count() or 2)
+                              cpu_threads=cpu_limit())
     return _model
+
+
+def unload() -> None:
+    """Drop Whisper from memory.
+
+    Whisper and NLLB are never needed at the same moment, and holding both
+    costs ~1GB against the container's ceiling. Transcription finishes before
+    translation starts, so releasing here is free.
+    """
+    global _model
+    if _model is not None:
+        _model = None
+        gc.collect()
+        log_memory("after unloading Whisper")
 
 
 def _join_fragments(words):
@@ -123,15 +141,17 @@ def transcribe(video: str, progress=lambda pct, msg: None) -> list[Cue]:
         progress(0.15, f"Loading Whisper ({MODEL_SIZE})")
         model = _load()
         progress(0.25, "Transcribing")
-        segs, _info = model.transcribe(
-            wav, language="en", beam_size=5,
-            word_timestamps=True,
-            vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500),
-            condition_on_previous_text=False,   # stops invented text over music
-        )
-        words = [{"w": w.word.strip(), "s": w.start, "e": w.end}
-                 for sg in segs for w in (sg.words or []) if w.word.strip()]
+        with stage(f"whisper transcribe ({MODEL_SIZE})"):
+            segs, _info = model.transcribe(
+                wav, language="en", beam_size=5,
+                word_timestamps=True,
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500),
+                condition_on_previous_text=False,   # stops invented text over music
+            )
+            words = [{"w": w.word.strip(), "s": w.start, "e": w.end}
+                     for sg in segs for w in (sg.words or []) if w.word.strip()]
+    log_memory("after transcribe")
     progress(0.9, f"{len(words)} words transcribed")
     return _build_cues(words)
 

@@ -53,12 +53,49 @@ target platform ignores subtitle tracks.
 | `WHISPER_MODEL` | `small` | `tiny` / `base` / `small` / `medium` — bigger is slower and more accurate |
 | `TRANSLATE_MODEL` | `facebook/nllb-200-distilled-600M` | swap for `...-1.3B` for better Persian (needs ~5.5GB RAM) |
 | `HF_HOME` | `/data/hf` | model cache — point at the volume |
+| `CPU_LIMIT` | auto-detected | override the core count if detection is wrong |
+| `TRANSLATE_BEAMS` | `2` | raise to 4 for slightly better Persian, double the time |
+| `TRANSLATE_BATCH` | `4` | lines translated at once; higher uses more memory |
+| `TRANSLATE_QUANTIZE` | `1` | set `0` to keep float32 weights |
+| `SUB_FONTSIZE` / `SUB_MARGIN` | `14` / `22` | burned-in subtitle size and position |
+
+### Why threads are capped
+
+`os.cpu_count()` reports the **host's** cores and ignores the container's
+cgroup quota. On an 8 vCPU service running on a much larger machine it can
+return 64 — and every library that sizes its thread pool that way then spawns
+64 workers for 8 usable cores.
+
+That costs twice over: context-switch contention, and one memory arena per
+thread. In practice it turned a ~3.5GB workload into 7GB against an 8GB
+ceiling, and a job that should take two minutes ran for forty-five without
+finishing, because the container kept being restarted.
+
+`pipeline/runtime.py` reads the real limit from cgroup v2, then v1, then
+scheduler affinity, and `pipeline/__init__.py` exports it as `OMP_NUM_THREADS`
+*before* torch or ctranslate2 import — they read it at load time, so setting it
+afterwards does nothing.
 
 ### Memory
 
-Whisper `small` and NLLB 600M loaded together need roughly 4GB. That fits
-Railway's Hobby plan. Moving to NLLB 1.3B pushes it to around 7GB — check your
-plan's ceiling before switching.
+With int8 quantisation and Whisper released before the translator loads, peak
+is around 2GB. Whisper alone measures ~690MB. Moving to NLLB 1.3B roughly
+doubles the translator's share — check your plan's ceiling before switching.
+
+### Reading the logs
+
+Every stage prints its duration and the memory around it:
+
+```
+[runtime] cpu_limit=8 (os.cpu_count reports 64)
+[stage] whisper transcribe (small) done in 41.2s
+[mem] now 654 MB, peak 693 MB after transcribe
+[mem] now 325 MB, peak 693 MB after unloading Whisper
+[stage] translate 51 lines (beams=2, batch=4) done in 96.4s
+```
+
+If a run is slow, that tells you which stage and whether memory is climbing —
+no need to read CPU graphs.
 
 ## Running locally
 
