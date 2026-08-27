@@ -67,7 +67,12 @@ if sub_choice != "None":
 
 st.divider()
 
+# Every button press reruns this script from the top, download buttons
+# included. So the finished video is kept in session state rather than in
+# local variables: without that, downloading the .srt reruns the page, the
+# variables are gone, and the video the user just waited minutes for vanishes.
 if st.button("Build video", type="primary", disabled=video_file is None):
+    st.session_state.pop("result", None)
     bar = st.progress(0.0)
     status = st.empty()
 
@@ -93,6 +98,7 @@ if st.button("Build video", type="primary", disabled=video_file is None):
             A.assemble(src, branded, picture=pic_path,
                        progress=lambda p, m: report(p * 0.4, m))
         result = branded
+        subtitle_files: dict[str, bytes] = {}
 
         # ---- step 2 + 3: subtitles -------------------------------------
         if sub_choice != "None":
@@ -115,22 +121,47 @@ if st.button("Build video", type="primary", disabled=video_file is None):
             result = S.attach(branded, srts, subbed, burn=burn_lang)
 
             for lang, path in srts.items():
-                st.download_button(
-                    f"Download {lang}.srt",
-                    open(path, "rb").read(),
-                    file_name=f"{lang}.srt",
-                    mime="text/plain",
-                )
+                with open(path, "rb") as f:
+                    subtitle_files[lang] = f.read()
 
         report(1.0, "Done")
         with open(result, "rb") as f:
-            data = f.read()
-
-        st.success(f"Ready - {len(data) / 1e6:.1f} MB")
-        st.video(data)
-        st.download_button("Download video", data, file_name="marefat_final.mp4",
-                           mime="video/mp4", type="primary")
+            st.session_state["result"] = {
+                "video": f.read(),
+                "subtitles": subtitle_files,
+                "name": os.path.splitext(video_file.name)[0],
+            }
 
     except Exception as exc:  # surfaced in the UI rather than only in logs
         st.error(f"Something went wrong: {exc}")
         raise
+
+
+# Rendered from session state, so it survives a download click.
+result = st.session_state.get("result")
+if result:
+    video = result["video"]
+    st.success(f"Ready — {len(video) / 1e6:.1f} MB")
+    st.video(video)
+
+    st.download_button(
+        "Download video",
+        video,
+        file_name=f"{result['name']}_marefat.mp4",
+        mime="video/mp4",
+        type="primary",
+        key="dl_video",
+    )
+
+    for lang, blob in result["subtitles"].items():
+        st.download_button(
+            f"Download {lang}.srt",
+            blob,
+            file_name=f"{result['name']}_{lang}.srt",
+            mime="text/plain",
+            key=f"dl_{lang}",
+        )
+
+    if st.button("Clear", key="clear"):
+        st.session_state.pop("result", None)
+        st.rerun()
