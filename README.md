@@ -32,6 +32,25 @@ Whisper breaks segments mid-clause, which yields cues ending on a dangling
 **Translation never recomputes timings.** The Farsi track reuses the English
 cue boundaries exactly, so the two stay in sync and translation stays cheap.
 
+**Sentences are translated, not subtitle lines.** A cue is a display unit, not
+a grammatical one — roughly a third of them are half-sentences. NLLB was
+trained on whole sentences, and given a fragment it invents the missing half.
+In a measured run, "starve the ego" came back as "starve *yourself*", and
+"a puzzle that *you* can manage" as "that *I* manage" — the fragment carried no
+subject, so the model chose one. `pipeline/translate.py` joins consecutive cues
+into sentences (51 cues → 37 sentences on a three-minute lesson), translates
+those, then redistributes the Persian across the original cues in proportion to
+how much English each carried. No split across languages is exact; each cue
+holding roughly its share at the right moment beats translating fragments.
+
+**A glossary fixes what context cannot.** Word-sense errors survive perfect
+context — this material's "partner" is a spouse, and the model reads it as a
+work colleague every time. `assets/glossary.json` is a Persian-to-Persian
+correction list applied after translation, matched on whole words so `همکار`
+never fires inside `همکاری`. Add an entry when a wrong rendering appears twice;
+keep the note explaining why, so the next person can judge whether it still
+holds.
+
 **Soft subtitles are the default.** The viewer can toggle them, and the video
 player handles right-to-left shaping for Farsi. Burning in works too (tested,
 renders correctly with Noto Naskh Arabic) but is permanent — use it when the
@@ -56,7 +75,8 @@ target platform ignores subtitle tracks.
 | `HF_HOME` | `/data/hf` | model cache — point at the volume |
 | `CPU_LIMIT` | auto-detected | override the core count if detection is wrong |
 | `TRANSLATE_BEAMS` | `2` | raise to 4 for slightly better Persian, double the time |
-| `TRANSLATE_BATCH` | `4` | lines translated at once; higher uses more memory |
+| `TRANSLATE_BATCH` | `8` | sentences translated at once; higher uses more memory |
+| `GLOSSARY` | `assets/glossary.json` | path to the correction list |
 | `SUB_FONTSIZE` / `SUB_MARGIN` | `14` / `22` | burned-in subtitle size and position |
 
 ### Why threads are capped

@@ -1,0 +1,34 @@
+{
+  "_comment": [
+    "Persian-to-Persian corrections applied after machine translation.",
+    "The model is consistent about its mistakes, so a short list fixes most of",
+    "them. Entries are matched on whole words only: 'همکار' will not match",
+    "inside 'همکاری'. Longer entries are applied before shorter ones, so a",
+    "phrase wins over a single word it contains.",
+    "",
+    "Add an entry whenever a wrong rendering shows up more than once. Keep the",
+    "note - it is what lets the next person judge whether the rule still holds."
+  ],
+  "terms": [
+    {
+      "from": "خودتو گرسنه کنی",
+      "to": "خودخواهی را گرسنه نگه دار",
+      "note": "'starve the ego' - the model read the object as the listener"
+    },
+    {
+      "from": "فرکانس ذهنی",
+      "to": "اصطکاک ذهنی",
+      "note": "'mental friction' was heard as 'frequency'"
+    },
+    {
+      "from": "همکارت",
+      "to": "شریکت",
+      "note": "'your partner' - a relationship, not a workplace"
+    },
+    {
+      "from": "همکار",
+      "to": "شریک",
+      "note": "'partner' - same reason"
+    }
+  ]
+}
