@@ -1,0 +1,119 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;700&family=Vazirmatn:wght@300;400;500;700&display=swap">
+<style>
+  /* Pinned to a light palette: the host app sets base="light" in
+     .streamlit/config.toml, and an iframe follows the OS rather than the app,
+     so a dark-aware panel would fight the page around it. */
+  :root{
+    --ground:#ffffff; --surface:#f7f7fa; --line:#e0e2ec; --line-strong:#c8ccdb;
+    --text:#242b47; --muted:#666e8c; --navy:#16224a; --on-navy:#e8eaf3;
+    --on-navy-muted:#a3abc9; --accent:#9a7734; --accent-soft:#f0e7d3;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--ground); color:var(--text);
+    font-family:"Vazirmatn","Segoe UI",Tahoma,sans-serif;
+    font-size:15px; line-height:2; -webkit-font-smoothing:antialiased;
+  }
+  .bar{
+    background:var(--navy); color:var(--on-navy);
+    border-bottom:2px solid var(--accent);
+    padding:1.1rem 1.4rem; display:flex; flex-wrap:wrap;
+    align-items:baseline; gap:.35rem 1rem;
+  }
+  .bar .name{font-family:"Noto Naskh Arabic",serif; font-weight:700; font-size:1.2rem;}
+  .bar .sub{color:var(--on-navy-muted); font-size:.8125rem; font-weight:300;}
+  .pad{padding:1.5rem 1.4rem 2rem;}
+  .fa{direction:rtl; text-align:right;}
+  h3{
+    font-family:"Noto Naskh Arabic",serif; font-weight:700; font-size:1.0625rem;
+    margin:0 0 .65rem; color:var(--navy);
+    display:flex; align-items:baseline; gap:.7rem;
+  }
+  h3::after{content:""; flex:1; height:1px; background:var(--line);}
+  p{margin:0 0 .9rem; max-width:38rem;}
+  .steps{list-style:none; margin:0 0 1.4rem; padding:0 1.6rem 0 0;
+         border-right:1px solid var(--line); display:flex;
+         flex-direction:column; gap:.7rem;}
+  .steps li{position:relative;}
+  .steps li::before{
+    content:attr(data-n); position:absolute; right:-2.45rem; top:.28rem;
+    width:1.55rem; height:1.55rem; border-radius:50%;
+    background:var(--ground); border:1px solid var(--line-strong);
+    color:var(--accent); font-size:.75rem; font-weight:700;
+    line-height:1.45rem; text-align:center;
+  }
+  .t{font-weight:700;}
+  .chip{
+    font-size:.7rem; font-weight:500; padding:.05rem .5rem; border-radius:1rem;
+    background:var(--accent-soft); color:var(--accent); margin-right:.45rem;
+    white-space:nowrap;
+  }
+  .d{color:var(--muted); font-size:.875rem; line-height:1.85;}
+  .note{
+    background:var(--surface); border-right:3px solid var(--accent);
+    border-radius:0 .25rem .25rem 0; padding:.85rem 1.1rem;
+    margin:0 0 1.6rem; font-size:.875rem; line-height:1.9; max-width:38rem;
+  }
+  .note p{margin:0;}
+  .en{direction:ltr; text-align:left; border-top:1px solid var(--line);
+      margin-top:1.6rem; padding-top:1.4rem;}
+  .en h3{font-family:"Vazirmatn",sans-serif; letter-spacing:.02em;}
+  .en ol{margin:0; padding-left:1.2rem;}
+  .en li{margin-bottom:.55rem; font-size:.9375rem; line-height:1.8; max-width:38rem;}
+  .en .tail{color:var(--muted); font-size:.875rem; margin-top:.9rem;}
+</style>
+
+<div class="bar">
+  <span class="name">ویدیوساز معرفت</span>
+  <span class="sub">Marefat Video Builder · Proof of Concept</span>
+</div>
+
+<div class="pad">
+  <div class="fa">
+    <h3>ساختار هر ویدیو</h3>
+    <ol class="steps">
+      <li data-n="۱"><span class="t">تصویر آغازین</span><span class="chip">۳ ثانیه</span>
+        <div class="d">کارت معرفت. در صورت نیاز می‌توان برای هر قسمت تصویر دیگری جایگزین کرد.</div></li>
+      <li data-n="۲"><span class="t">کلیپ ابتدایی</span><span class="chip">۸ ثانیه</span>
+        <div class="d">تیزر لوگوی مدرسه، ثابت برای همهٔ ویدیوها.</div></li>
+      <li data-n="۳"><span class="t">ویدیوی درس</span><span class="chip">طول اصلی</span>
+        <div class="d">لوگوی متحرک یک بار در گوشهٔ بالا ظاهر می‌شود و سپس محو می‌گردد.</div></li>
+      <li data-n="۴"><span class="t">کلیپ پایانی</span><span class="chip">۱۲ ثانیه</span>
+        <div class="d">تیزر پایانی، ثابت برای همهٔ ویدیوها.</div></li>
+    </ol>
+
+    <div class="note"><p>همهٔ بخش‌ها پیش از اتصال به یک کیفیت تصویر، نرخ فریم و قالب
+      صدای یکسان تبدیل می‌شوند تا در محل اتصال پرش تصویر یا قطعی صدا رخ ندهد.</p></div>
+
+    <h3>زیرنویس</h3>
+    <p>گفتار انگلیسی نخست به متن تبدیل می‌شود و سپس همان متن به فارسی ترجمه می‌گردد.
+      زمان‌بندی هر دو زبان یکسان است، بنابراین زیرنویس فارسی دقیقاً با گفتار هماهنگ می‌ماند.</p>
+
+    <div class="note"><p><strong>ترجمه ماشینی است</strong> و برای انتشار عمومی باید
+      بازبینی شود. فایل زیرنویس جداگانه قابل دانلود، ویرایش و جایگزینی است.</p></div>
+
+    <h3>حریم داده</h3>
+    <p>هیچ ویدیو یا متنی به سرویس بیرونی فرستاده نمی‌شود؛ همهٔ پردازش روی همین سرور
+      انجام می‌گیرد.</p>
+  </div>
+
+  <div class="en">
+    <h3>How this works</h3>
+    <ol>
+      <li><strong>Branding</strong> — your clip is normalised to 1280×720 / 30fps /
+        stereo 48kHz, then joined behind the opening card and intro and ahead of the
+        outro. The animated logo plays once over the first seconds of your clip.</li>
+      <li><strong>Subtitles</strong> <em>(optional)</em> — Whisper transcribes the
+        finished video; subtitles are rebuilt from word-level timestamps at sentence
+        boundaries.</li>
+      <li><strong>Farsi</strong> <em>(optional)</em> — NLLB-200 translates the English
+        lines. Timings are reused exactly, so the two languages stay in sync.</li>
+    </ol>
+    <p class="tail">Nothing is sent to an external service — all three models run in
+      this container.</p>
+  </div>
+</div>

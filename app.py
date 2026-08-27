@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import os
 import tempfile
+from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from pipeline import assemble as A
 from pipeline import subtitles as S
@@ -22,45 +24,10 @@ st.caption(
 )
 
 with st.expander("راهنما  ·  How this works"):
-    st.markdown(
-        """
-<div dir="rtl" style="line-height:2;">
-
-**ساختار هر ویدیو**
-
-۱. تصویر آغازین — ۳ ثانیه &nbsp;·&nbsp; ۲. کلیپ ابتدایی — ۸ ثانیه &nbsp;·&nbsp;
-۳. ویدیوی درس، با لوگوی متحرک در گوشه &nbsp;·&nbsp; ۴. کلیپ پایانی — ۱۲ ثانیه
-
-همهٔ بخش‌ها پیش از اتصال به یک کیفیت، نرخ فریم و قالب صدای یکسان تبدیل می‌شوند تا
-در محل اتصال پرش تصویر یا قطعی صدا رخ ندهد.
-
-**زیرنویس**
-
-گفتار انگلیسی نخست به متن تبدیل می‌شود و سپس همان متن به فارسی ترجمه می‌گردد.
-زمان‌بندی هر دو زبان یکسان است. **ترجمه ماشینی است** و برای انتشار عمومی باید
-بازبینی شود — فایل زیرنویس جداگانه قابل دانلود و ویرایش است.
-
-هیچ ویدیو یا متنی به سرویس بیرونی فرستاده نمی‌شود؛ همهٔ پردازش روی همین سرور
-انجام می‌گیرد.
-
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
----
-
-1. **Branding** — your clip is normalised to 1280×720 / 30fps / stereo 48kHz,
-   then joined behind the opening card and intro and ahead of the outro. The
-   animated logo plays once over the first seconds of your clip.
-2. **Subtitles** *(optional)* — Whisper transcribes the finished video and
-   subtitles are rebuilt from word-level timestamps at sentence boundaries.
-3. **Farsi** *(optional)* — NLLB-200 translates the English lines. Timings are
-   reused exactly, so the two languages stay in sync.
-
-Nothing is sent to an external service — all three models run in this container.
-"""
+    components.html(
+        (Path(__file__).parent / "assets" / "info_panel.html").read_text("utf-8"),
+        height=760,
+        scrolling=True,
     )
 
 video_file = st.file_uploader(
