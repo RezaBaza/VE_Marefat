@@ -12,7 +12,10 @@ from pipeline.runtime import cpu_limit, stage
 
 st.set_page_config(page_title="Marefat Video Builder", page_icon="🎬")
 
-st.title("POC (Proof of Concept) Marefat Video Builder")
+# small line above the title, so "POC" reads as a status label rather than
+# part of the product's name
+st.caption("PROOF OF CONCEPT")
+st.title("Marefat Video Builder")
 st.caption(
     "Adds the opening card, intro, animated logo and outro. "
     "Subtitles are optional."
