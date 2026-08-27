@@ -17,7 +17,7 @@ ASSETS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))
 # ---- house style --------------------------------------------------------
 WIDTH, HEIGHT, FPS = 1280, 720, 30
 AUDIO_RATE = 48000
-PIC_SECONDS = 10          # how long the opening picture holds
+PIC_SECONDS = 3          # how long the opening picture holds
 LOGO_WIDTH = 170          # logo width in px
 LOGO_MARGIN = 28          # distance from the top-right corner
 

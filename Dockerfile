@@ -10,10 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# CPU-only torch: ~200MB instead of the ~2.5GB CUDA build we have no GPU for
-RUN pip install --no-cache-dir torch==2.5.1 \
-        --index-url https://download.pytorch.org/whl/cpu
-
+# No torch. Both models run through CTranslate2 (a faster-whisper dependency),
+# which is faster on CPU and needs no deep-learning framework alongside it.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -24,7 +22,7 @@ COPY . .
 ENV HF_HOME=/data/hf \
     XDG_CACHE_HOME=/data/cache \
     WHISPER_MODEL=small \
-    TRANSLATE_MODEL=facebook/nllb-200-distilled-600M
+    TRANSLATE_MODEL=OpenNMT/nllb-200-distilled-1.3B-ct2-int8
 
 EXPOSE 8080
 CMD streamlit run app.py \

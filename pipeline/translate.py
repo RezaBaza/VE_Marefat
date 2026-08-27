@@ -1,18 +1,20 @@
-"""Step 3 - translate English subtitles to Farsi with NLLB-200 (open source).
+"""Step 3 - translate English subtitles to Farsi with NLLB-200.
 
 Timings are never recomputed. The cues from step 2 keep their exact start/end;
 only the text changes. That is why translation is cheap next to transcription.
 
-Sized for a CPU container rather than a GPU:
+Runs the model through CTranslate2 rather than PyTorch. Three reasons:
 
-* weights are int8-quantised at load, cutting memory roughly 4x and speeding
-  up matmuls on CPU - a 600M seq2seq model in float32 needs ~2.4GB before any
-  activations, which is most of an 8GB budget once Whisper has also run;
-* `num_beams=2` instead of 4, halving the work for a difference that does not
-  survive a human correction pass anyway;
-* threads are capped to the cgroup limit (see pipeline/runtime.py).
+* the 1.3B checkpoint ships pre-quantised to int8 at ~1.4GB, against ~5.5GB
+  for the float32 PyTorch weights - which matters because a Railway Hobby
+  volume is capped at 5GB, so the PyTorch version simply does not fit;
+* CTranslate2 is already installed as a faster-whisper dependency, so this
+  costs no new packages and lets the image drop torch entirely;
+* it is markedly faster than PyTorch for inference on CPU, which is the only
+  hardware this container has.
 
-Model is swappable via TRANSLATE_MODEL.
+Only the tokenizer comes from the original Meta repo - a ~17MB download of
+vocabulary files, not the weights.
 """
 from __future__ import annotations
 
@@ -20,75 +22,48 @@ import os
 
 from pipeline.runtime import cpu_limit, log_memory, stage
 
-MODEL_NAME = os.environ.get("TRANSLATE_MODEL", "facebook/nllb-200-distilled-600M")
+MODEL_NAME = os.environ.get(
+    "TRANSLATE_MODEL", "OpenNMT/nllb-200-distilled-1.3B-ct2-int8")
+TOKENIZER_NAME = os.environ.get(
+    "TRANSLATE_TOKENIZER", "facebook/nllb-200-distilled-1.3B")
+
 SRC_LANG = "eng_Latn"
 TGT_LANG = "pes_Arab"      # Western Persian, Arabic script
-BATCH = int(os.environ.get("TRANSLATE_BATCH", "4"))
+BATCH = int(os.environ.get("TRANSLATE_BATCH", "8"))
 BEAMS = int(os.environ.get("TRANSLATE_BEAMS", "2"))
-QUANTIZE = os.environ.get("TRANSLATE_QUANTIZE", "1") != "0"
 
-_tok = _model = None
+_tok = _translator = None
 
 
 def _load():
-    global _tok, _model
-    if _model is None:
-        import torch
-        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+    global _tok, _translator
+    if _translator is None:
+        import ctranslate2
+        from huggingface_hub import snapshot_download
+        from transformers import AutoTokenizer
 
-        torch.set_num_threads(cpu_limit())
+        with stage(f"fetch {MODEL_NAME}"):
+            model_dir = snapshot_download(MODEL_NAME)
 
-        with stage(f"load {MODEL_NAME}"):
-            _tok = AutoTokenizer.from_pretrained(MODEL_NAME, src_lang=SRC_LANG)
-            model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
-            model.eval()
-
-            if QUANTIZE:
-                with stage("quantise to int8"):
-                    model = torch.quantization.quantize_dynamic(
-                        model, {torch.nn.Linear}, dtype=torch.qint8)
-            _model = model
+        with stage("load tokenizer + translator"):
+            _tok = AutoTokenizer.from_pretrained(TOKENIZER_NAME, src_lang=SRC_LANG)
+            _translator = ctranslate2.Translator(
+                model_dir,
+                device="cpu",
+                compute_type="int8",
+                # one model, several cores: parallelism belongs inside an op,
+                # not across replicas of the model
+                inter_threads=1,
+                intra_threads=cpu_limit(),
+            )
         log_memory("after loading translator")
-    return _tok, _model
-
-
-def _target_token_id(tok) -> int:
-    """Resolve the Farsi language token.
-
-    NLLB moved this between transformers versions, so both spellings are
-    tried. The important part is rejecting the unknown-token id:
-    `convert_tokens_to_ids` returns UNK rather than failing for a token it
-    does not know, and forcing UNK as the first decoder token makes the model
-    emit fluent nonsense until it hits max_length - slow *and* wrong, with
-    nothing in the output to say the language was never selected.
-    """
-    unk = getattr(tok, "unk_token_id", None)
-
-    for getter in (
-        lambda: tok.convert_tokens_to_ids(TGT_LANG),
-        lambda: tok.lang_code_to_id[TGT_LANG],
-        lambda: tok.get_vocab()[TGT_LANG],
-    ):
-        try:
-            tid = getter()
-        except Exception:
-            continue
-        if tid is not None and tid >= 0 and tid != unk:
-            return int(tid)
-
-    raise RuntimeError(
-        f"{MODEL_NAME} does not expose the language token {TGT_LANG!r}. "
-        "Check that TRANSLATE_MODEL is an NLLB-200 checkpoint."
-    )
+    return _tok, _translator
 
 
 def translate_cues(cues, progress=lambda pct, msg: None):
     """Return new cues with Farsi text and identical timings."""
-    import torch
-
     progress(0.05, f"Loading {MODEL_NAME}")
-    tok, model = _load()
-    forced = _target_token_id(tok)
+    tok, translator = _load()
 
     # subtitles are wrapped across two lines for display; translate them flat
     texts = [" ".join(c.text.split()) for c in cues]
@@ -97,12 +72,27 @@ def translate_cues(cues, progress=lambda pct, msg: None):
     with stage(f"translate {len(texts)} lines (beams={BEAMS}, batch={BATCH})"):
         for i in range(0, len(texts), BATCH):
             batch = texts[i:i + BATCH]
-            enc = tok(batch, return_tensors="pt", padding=True,
-                      truncation=True, max_length=192)
-            with torch.inference_mode():
-                gen = model.generate(**enc, forced_bos_token_id=forced,
-                                     max_new_tokens=128, num_beams=BEAMS)
-            out += tok.batch_decode(gen, skip_special_tokens=True)
+
+            # CTranslate2 works in tokens, not ids
+            tokenized = [tok.convert_ids_to_tokens(tok.encode(t)) for t in batch]
+
+            results = translator.translate_batch(
+                tokenized,
+                # forces the output language - the NLLB equivalent of
+                # forced_bos_token_id in transformers
+                target_prefix=[[TGT_LANG]] * len(batch),
+                beam_size=BEAMS,
+                max_decoding_length=192,
+            )
+
+            for res in results:
+                # hypothesis starts with the language token we forced
+                tokens = res.hypotheses[0]
+                if tokens and tokens[0] == TGT_LANG:
+                    tokens = tokens[1:]
+                out.append(tok.decode(tok.convert_tokens_to_ids(tokens),
+                                      skip_special_tokens=True))
+
             done = min(i + BATCH, len(texts))
             progress(0.05 + 0.9 * done / max(len(texts), 1),
                      f"Translated {done}/{len(texts)} lines")

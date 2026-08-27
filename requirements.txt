@@ -1,4 +1,6 @@
 streamlit==1.40.2
 faster-whisper==1.2.1
+# transformers is here for the NLLB tokenizer only - the model itself runs
+# through CTranslate2, which arrives as a faster-whisper dependency
 transformers==4.46.3
 sentencepiece==0.2.0

@@ -15,7 +15,7 @@ Everything runs on free, open-source tools. No API keys, no per-video cost.
 |---|---|---|
 | Branding | FFmpeg | normalises to 1280×720 / 30fps / stereo 48kHz before joining |
 | Transcription | faster-whisper (`small`) | word-level timestamps, English |
-| Translation | NLLB-200 distilled 600M | English → Farsi, reuses the English timings |
+| Translation | NLLB-200 distilled 1.3B (CTranslate2 int8) | English → Farsi, reuses the English timings |
 | Output | FFmpeg | soft subtitle tracks, or burned into the picture |
 
 ## Why the pieces are the way they are
@@ -51,12 +51,12 @@ target platform ignores subtitle tracks.
 | Variable | Default | Purpose |
 |---|---|---|
 | `WHISPER_MODEL` | `small` | `tiny` / `base` / `small` / `medium` — bigger is slower and more accurate |
-| `TRANSLATE_MODEL` | `facebook/nllb-200-distilled-600M` | swap for `...-1.3B` for better Persian (needs ~5.5GB RAM) |
+| `TRANSLATE_MODEL` | `OpenNMT/nllb-200-distilled-1.3B-ct2-int8` | must be a **CTranslate2** conversion, not a PyTorch repo |
+| `TRANSLATE_TOKENIZER` | `facebook/nllb-200-distilled-1.3B` | vocabulary only, ~17MB |
 | `HF_HOME` | `/data/hf` | model cache — point at the volume |
 | `CPU_LIMIT` | auto-detected | override the core count if detection is wrong |
 | `TRANSLATE_BEAMS` | `2` | raise to 4 for slightly better Persian, double the time |
 | `TRANSLATE_BATCH` | `4` | lines translated at once; higher uses more memory |
-| `TRANSLATE_QUANTIZE` | `1` | set `0` to keep float32 weights |
 | `SUB_FONTSIZE` / `SUB_MARGIN` | `14` / `22` | burned-in subtitle size and position |
 
 ### Why threads are capped
@@ -76,11 +76,31 @@ scheduler affinity, and `pipeline/__init__.py` exports it as `OMP_NUM_THREADS`
 *before* torch or ctranslate2 import — they read it at load time, so setting it
 afterwards does nothing.
 
-### Memory
+### Why CTranslate2 and not PyTorch
 
-With int8 quantisation and Whisper released before the translator loads, peak
-is around 2GB. Whisper alone measures ~690MB. Moving to NLLB 1.3B roughly
-doubles the translator's share — check your plan's ceiling before switching.
+A Railway **Hobby volume is capped at 5GB** and cannot be resized past it. The
+float32 PyTorch build of NLLB-1.3B is ~5.5GB, so it does not fit — with an
+empty volume, let alone alongside Whisper.
+
+The same checkpoint converted to CTranslate2 int8 is **~1.4GB**: smaller than
+the 600M PyTorch model it replaces, while being the larger and better model.
+CTranslate2 also arrives free with faster-whisper and outperforms PyTorch for
+CPU inference, so the image drops `torch` entirely.
+
+`TRANSLATE_MODEL` must therefore name a **CTranslate2 conversion**. Pointing it
+at `facebook/nllb-200-...` will fail — those are PyTorch repos.
+
+### Disk and memory
+
+| | |
+|---|---|
+| Whisper `small` | ~0.5GB on disk, ~690MB resident |
+| NLLB 1.3B ct2-int8 | ~1.4GB on disk |
+| Tokenizer | ~17MB |
+| **Volume total** | **~2GB** of the 5GB Hobby cap |
+
+Whisper is released before the translator loads (measured: 654MB → 325MB), so
+the two never occupy memory together.
 
 ### Reading the logs
 
